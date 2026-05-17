@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drum Machine — прототип v2</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --card: #171a2b;
+      --accent: #7c5cff;
+      --accent-2: #36d6ae;
+      --text: #e8e8f0;
+      --muted: #a7acc0;
+      --danger: #ff4d6d;
+      --ok: #55e07a;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1000px 600px at 10% -10%, #1e2140 0%, var(--bg) 35%), var(--bg);
+      color: var(--text);
+    }
+    .container { max-width: 1150px; margin: 32px auto; padding: 0 16px; }
+    header {
+      display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: start; margin-bottom: 18px;
+    }
+    .title { font-weight: 700; letter-spacing: 0.3px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; }
+    .control {
+      background: linear-gradient(180deg, #1f2340 0%, var(--card) 100%);
+      border: 1px solid #2b2f4d; border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .range { display:flex; align-items:center; gap:10px; }
+    input[type="range"] { width: 180px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .pad {
+      background: linear-gradient(180deg, #212548 0%, #171a2b 100%);
+      border: 1px solid #2b2f4d; border-radius: 16px; padding: 14px; position: relative;
+      box-shadow: 0 10px 28px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.04);
+      overflow: hidden;
+    }
+    .pad h3 { margin: 0 0 10px 0; font-size: 16px; color: var(--text); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .pad-title-wrap { display:flex; gap:8px; align-items:center; }
+    .kbd { color: var(--muted); font-size: 12px; border: 1px solid #33395c; background:#1c2040; padding: 2px 6px; border-radius:6px; }
+    .actions { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    button, label.btn {
+      padding: 10px 12px; border-radius: 10px; border: 1px solid #36406b; background: linear-gradient(180deg, #2b346a 0%, #232955 100%);
+      color: var(--text); cursor: pointer; font-weight: 600; letter-spacing: .2px;
+      transition: transform .06s ease, filter .2s ease, background .2s ease; user-select:none;
+    }
+    button:hover, label.btn:hover { filter: brightness(1.1); }
+    button:active, label.btn:active { transform: translateY(1px) scale(0.995); }
+    .btn-secondary { background: linear-gradient(180deg, #273158 0%, #202646 100%); }
+    .btn-danger { background: linear-gradient(180deg, #7b2940 0%, #5a1e31 100%); border-color: #8a2f47; }
+    .btn-ok { background: linear-gradient(180deg, #26613b 0%, #1f4e2f 100%); border-color: #2f7a4e; }
+    .small { font-size: 12px; padding: 6px 8px; border-radius: 8px; }
+    input[type="file"] { display: none; }
+    .filename { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .meter { width: 6px; position: absolute; top:0; right:0; bottom:0; background: linear-gradient(180deg, var(--accent-2), var(--accent)); opacity:.22; transform: scaleY(0); transform-origin: bottom; transition: transform .06s linear; }
+    .pad.playing .meter { transform: scaleY(1); opacity:.45; }
+    .footer { margin-top: 22px; color: var(--muted); font-size: 12px; }
+    .recording-indicator { color: var(--danger); font-weight: 700; display:none; }
+    .recording .recording-indicator { display:inline; }
+    a.dl { color: #b7c3ff; text-decoration: none; border-bottom: 1px dashed #b7c3ff; }
+
+    .metronome-led {
+      width: 10px; height: 10px; border-radius: 50%; background: #3a415f; box-shadow: 0 0 0 0 rgba(85,224,122,0.0);
+      transition: background .06s ease, box-shadow .06s ease; display:inline-block; margin-right: 6px;
+    }
+    .metronome-led.on { background: var(--ok); box-shadow: 0 0 10px 2px rgba(85,224,122,0.6); }
+    .toggle { display:flex; align-items:center; gap:8px; }
+    .switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background:#2a2f4f; position: relative; outline: none; border:1px solid #36406b; cursor: pointer; }
+    .switch:before { content:""; width: 16px; height:16px; border-radius: 50%; background:#cfd5ff; position:absolute; top:2px; left:2px; transition: left .15s ease; }
+    .switch:checked { background:#3452b8; }
+    .switch:checked:before { left: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">
+        <div style="font-size:22px">Drum Machine — прототип</div>
+        <div style="font-size:12px; color:var(--muted)">Горячие клавиши (раскладка-независимо): Q W E — Kick / Snare / Hi‑Hat, A S D — Synth 1 / 2 / 3</div>
+      </div>
+      <div class="controls">
+        <div class="control range" title="Громкость мастер-канала">
+          <span style="font-size:12px; color:var(--muted)">Громкость</span>
+          <input id="volume" type="range" min="0" max="100" value="80" />
+        </div>
+
+        <div class="control" title="Метроном">
+          <span class="metronome-led" id="metroLed"></span>
+          <button id="metroBtn" class="btn-ok">Метроном</button>
+          <span style="font-size:12px; color:var(--muted)">BPM</span>
+          <input id="bpm" type="range" min="40" max="240" value="120" />
+          <input id="bpmNum" type="number" min="40" max="240" value="120" style="width:64px; background:#1c2040; border:1px solid #36406b; color:var(--text); border-radius:8px; padding:6px 8px;" />
+        </div>
+
+        <div class="control toggle" title="Горячие клавиши">
+          <input type="checkbox" id="hkToggle" class="switch" checked />
+          <label for="hkToggle" style="font-size:12px; color:var(--muted); cursor:pointer">Горячие клавиши</label>
+        </div>
+
+        <div class="control">
+          <button id="recBtn" class="btn-danger">● Запись</button>
+          <span id="recStatus" class="recording-indicator">идёт запись…</span>
+          <span id="timer" style="font-size:12px; color:var(--muted)"></span>
+          <span id="dlWrap" style="margin-left:10px"></span>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid" id="pads"></section>
+
+    <div class="footer">
+      Подсказки: загрузите свои звуки (WAV/MP3/OGG) на каждую кнопку. Если звук не загружен — играет встроенный синтез.
+      Запись экспортируется в WEBM/Opus. Для наилучшей совместимости используйте Chrome/Edge/Firefox на ПК.
+      Двойной клик по названию пэда — переименовать. Или кнопка ✎ Имя.
+    </div>
+  </div>
+
+  <script>
+    // ====== АУДИО БАЗА ======
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContextClass();
+
+    const masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.8;
+
+    const mediaDest = audioCtx.createMediaStreamDestination();
+    masterGain.connect(audioCtx.destination);
+    masterGain.connect(mediaDest);
+
+    // ====== ПЭДЫ ======
+    const padDefs = [
+      { id: 'kick',   label: 'Kick',   code: 'KeyQ', keyLabel: 'Q' },
+      { id: 'snare',  label: 'Snare',  code: 'KeyW', keyLabel: 'W' },
+      { id: 'hihat',  label: 'Hi‑Hat', code: 'KeyE', keyLabel: 'E' },
+      { id: 's1',     label: 'Synth 1', code: 'KeyA', keyLabel: 'A' },
+      { id: 's2',     label: 'Synth 2', code: 'KeyS', keyLabel: 'S' },
+      { id: 's3',     label: 'Synth 3', code: 'KeyD', keyLabel: 'D' },
+    ];
+
+    const sampleBuffers = {}; // id -> AudioBuffer
+    const padNames = loadNames(); // id -> label
+
+    const padsEl = document.getElementById('pads');
+
+    padDefs.forEach(def => {
+      const name = padNames[def.id] || def.label;
+
+      const card = document.createElement('div');
+      card.className = 'pad';
+      card.id = 'pad-' + def.id;
+
+      const h3 = document.createElement('h3');
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'pad-title-wrap';
+      const titleSpan = document.createElement('span');
+      titleSpan.textContent = name;
+      titleSpan.className = 'pad-title';
+      titleSpan.title = 'Двойной клик — переименовать';
+      titleSpan.addEventListener('dblclick', () => editPadName(def.id));
+      titleWrap.appendChild(titleSpan);
+
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '✎ Имя';
+      editBtn.className = 'small';
+      editBtn.addEventListener('click', () => editPadName(def.id));
+      titleWrap.appendChild(editBtn);
+
+      const kbd = document.createElement('span');
+      kbd.className = 'kbd';
+      kbd.textContent = def.keyLabel;
+
+      h3.appendChild(titleWrap);
+      h3.appendChild(kbd);
+      card.appendChild(h3);
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const playBtn = document.createElement('button');
+      playBtn.textContent = '▶ Играть';
+      playBtn.addEventListener('click', () => trigger(def.id));
+      actions.appendChild(playBtn);
+
+      const fileLabel = document.createElement('label');
+      fileLabel.className = 'btn btn-secondary';
+      fileLabel.textContent = 'Загрузить звук';
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'audio/*';
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const arr = await file.arrayBuffer();
+          const buf = await audioCtx.decodeAudioData(arr);
+          sampleBuffers[def.id] = buf;
+          filename.textContent = file.name;
+        } catch (err) {
+          alert('Не удалось загрузить аудио: ' + err);
+        }
+      });
+      fileLabel.appendChild(fileInput);
+      actions.appendChild(fileLabel);
+
+      const clearBtn = document.createElement('button');
+      clearBtn.className = 'small';
+      clearBtn.textContent = '✕ Сбросить звук';
+      clearBtn.addEventListener('click', () => {
+        delete sampleBuffers[def.id];
+        filename.textContent = 'по умолчанию';
+      });
+      actions.appendChild(clearBtn);
+
+      const filename = document.createElement('div');
+      filename.className = 'filename';
+      filename.textContent = 'по умолчанию';
+
+      card.appendChild(actions);
+      card.appendChild(filename);
+
+      const meter = document.createElement('div');
+      meter.className = 'meter';
+      card.appendChild(meter);
+
+      padsEl.appendChild(card);
+    });
+
+    // ====== ПЕРЕИМЕНОВАНИЕ ======
+    function editPadName(id) {
+      const el = document.querySelector('#pad-' + id + ' .pad-title');
+      const current = el.textContent || '';
+      const next = prompt('Новое имя пэда:', current);
+      if (next === null) return; // отмена
+      const name = next.trim().slice(0, 40) || current; // ограничим длину, пустое — оставим старое
+      el.textContent = name;
+      padNames[id] = name;
+      saveNames();
+    }
+
+    function loadNames() {
+      try {
+        const raw = localStorage.getItem('dm_pad_names');
+        return raw ? JSON.parse(raw) : {};
+      } catch { return {}; }
+    }
+    function saveNames() {
+      try { localStorage.setItem('dm_pad_names', JSON.stringify(padNames)); } catch {}
+    }
+
+    // ====== КЛАВИАТУРА ======
+    const hkToggle = document.getElementById('hkToggle');
+    const codeMap = Object.fromEntries(padDefs.map(d => [d.code, d.id]));
+
+    window.addEventListener('keydown', (e) => {
+      if (!hkToggle.checked) return;
+      // Игнор, если фокус в поле ввода/тексте
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      const isEditable = document.activeElement?.isContentEditable;
+      if (tag === 'input' || tag === 'textarea' || isEditable) return;
+
+      const id = codeMap[e.code];
+      if (id) {
+        e.preventDefault();
+        trigger(id);
+      }
+    });
+
+    // ====== ГРОМКОСТЬ ======
+    const vol = document.getElementById('volume');
+    const setGain = (v) => {
+      const norm = Math.max(0, Math.min(1, v/100));
+      masterGain.gain.value = norm * norm; // квадратичная кривая звучит естественнее
+    };
+    setGain(parseFloat(vol.value));
+    vol.addEventListener('input', (e) => setGain(parseFloat(e.target.value)));
+
+    // ====== ЗАПИСЬ ======
+    const recBtn = document.getElementById('recBtn');
+    const recStatus = document.getElementById('recStatus');
+    const timerEl = document.getElementById('timer');
+    const dlWrap = document.getElementById('dlWrap');
+
+    let mediaRecorder = null;
+    let chunks = [];
+    let recTimer = null;
+    let recStartAt = 0;
+
+    function supportsRecording() {
+      return 'MediaRecorder' in window && (MediaRecorder.isTypeSupported('audio/webm;codecs=opus') || MediaRecorder.isTypeSupported('audio/webm'));
+    }
+
+    function formatTime(ms) {
+      const s = Math.floor(ms/1000);
+      const m = Math.floor(s/60);
+      const sec = s % 60;
+      return `${m}:${sec.toString().padStart(2,'0')}`;
+    }
+
+    function startTimer() {
+      recStartAt = performance.now();
+      timerEl.textContent = '0:00';
+      recTimer = setInterval(() => {
+        timerEl.textContent = formatTime(performance.now() - recStartAt);
+      }, 200);
+    }
+
+    function stopTimer() { clearInterval(recTimer); timerEl.textContent = ''; }
+
+    function setupRecorder() {
+      try {
+        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+        mediaRecorder = new MediaRecorder(mediaDest.stream, { mimeType: mime });
+        mediaRecorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          chunks = [];
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const fname = `drum-recording-${new Date().toISOString().replace(/[:.]/g,'-')}.webm`;
+          a.href = url; a.download = fname; a.textContent = 'Скачать запись';
+          a.className = 'dl';
+          dlWrap.innerHTML = '';
+          dlWrap.appendChild(a);
+        };
+      } catch (e) {
+        alert('Запись недоступна: ' + e);
+      }
+    }
+
+    recBtn.addEventListener('click', async () => {
+      if (audioCtx.state !== 'running') await audioCtx.resume();
+
+      if (!supportsRecording()) {
+        alert('Запись не поддерживается этим браузером. Попробуйте Chrome/Edge/Firefox на ПК.');
+        return;
+      }
+      if (!mediaRecorder) setupRecorder();
+
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        recBtn.textContent = '● Запись';
+        document.body.classList.remove('recording');
+        recStatus.style.display = 'none';
+        stopTimer();
+      } else {
+        dlWrap.innerHTML = '';
+        chunks = [];
+        mediaRecorder.start();
+        recBtn.textContent = '■ Стоп';
+        document.body.classList.add('recording');
+        recStatus.style.display = 'inline';
+        startTimer();
+      }
+    });
+
+    // ====== ПРОИГРЫВАНИЕ ======
+    async function trigger(id) {
+      if (audioCtx.state !== 'running') await audioCtx.resume();
+      visualPing(id);
+
+      const buf = sampleBuffers[id];
+      if (buf) {
+        playBuffer(buf);
+      } else {
+        switch(id){
+          case 'kick':  playKick(); break;
+          case 'snare': playSnare(); break;
+          case 'hihat': playHiHat(); break;
+          case 's1':    playTone(220, 'sawtooth', 0.4); break; // A3
+          case 's2':    playTone(261.63, 'triangle', 0.5); break; // C4
+          case 's3':    playChord([329.63, 392.00, 523.25], 'sine', 0.6); break; // E4 G4 C5
+        }
+      }
+    }
+
+    function visualPing(id){
+      const el = document.getElementById('pad-'+id);
+      el.classList.add('playing');
+      setTimeout(()=>el.classList.remove('playing'), 120);
+    }
+
+    function playBuffer(buffer){
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(1.0, audioCtx.currentTime);
+      src.connect(g).connect(masterGain);
+      src.start();
+    }
+
+    // ====== СИНТЕЗ ПО УМОЛЧАНИЮ ======
+    function playKick(){
+      const t0 = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(1.0, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.2);
+      osc.frequency.setValueAtTime(150, t0);
+      osc.frequency.exponentialRampToValueAtTime(50, t0 + 0.2);
+      osc.connect(g).connect(masterGain);
+      osc.start(t0);
+      osc.stop(t0 + 0.21);
+    }
+
+    function playSnare(){
+      const t0 = audioCtx.currentTime;
+      const bufferSize = audioCtx.sampleRate * 0.25;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i=0; i<bufferSize; i++) data[i] = (Math.random()*2 - 1);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.5;
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.9, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.2);
+      src.connect(bp).connect(g).connect(masterGain);
+      src.start(t0);
+      src.stop(t0 + 0.22);
+    }
+
+    function playHiHat(){
+      const t0 = audioCtx.currentTime;
+      const bufferSize = audioCtx.sampleRate * 0.1;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i=0; i<bufferSize; i++) data[i] = (Math.random()*2 - 1);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 7000; hp.Q.value = 0.7;
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.6, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.08);
+      src.connect(hp).connect(g).connect(masterGain);
+      src.start(t0);
+      src.stop(t0 + 0.1);
+    }
+
+    function playTone(freq, type='sine', dur=0.5){
+      const t0 = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = type; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.7, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g).connect(masterGain);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    }
+
+    function playChord(freqs, type='sawtooth', dur=0.6){
+      const t0 = audioCtx.currentTime;
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.8, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      g.connect(masterGain);
+      freqs.forEach(f => {
+        const o = audioCtx.createOscillator();
+        o.type = type; o.frequency.value = f;
+        o.connect(g);
+        o.start(t0);
+        o.stop(t0 + dur + 0.02);
+      });
+    }
+
+    // ====== МЕТРОНОМ ======
+    const metroBtn = document.getElementById('metroBtn');
+    const bpmSlider = document.getElementById('bpm');
+    const bpmNum = document.getElementById('bpmNum');
+    const metroLed = document.getElementById('metroLed');
+
+    let metroOn = false;
+    let currentBpm = parseInt(bpmSlider.value, 10) || 120;
+    let nextNoteTime = 0; // время в AudioContext
+    let currentBeat = 0;  // 0..3
+    let schedulerTimer = null;
+    const scheduleAheadTime = 0.1; // секундами, окно планирования
+    const lookahead = 25; // мс, как часто планируем
+
+    const metroGain = audioCtx.createGain();
+    metroGain.gain.value = 1.0; // громкость клика относительная
+    metroGain.connect(masterGain); // чтобы писалось в запись и шло в мастер
+
+    function setBpm(val){
+      const v = Math.max(40, Math.min(240, parseInt(val,10)||120));
+      bpmSlider.value = v; bpmNum.value = v; currentBpm = v;
+    }
+
+    bpmSlider.addEventListener('input', e => setBpm(e.target.value));
+    bpmNum.addEventListener('input', e => setBpm(e.target.value));
+
+    function nextNote(){
+      const secondsPerBeat = 60.0 / currentBpm;
+      nextNoteTime += secondsPerBeat;
+      currentBeat = (currentBeat + 1) % 4; // 4/4 размер
+    }
+
+    function scheduleClick(time, accented){
+      // Короткий клик-импульс
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(accented ? 2000 : 1400, time);
+      g.gain.setValueAtTime(accented ? 0.6 : 0.35, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+      osc.connect(g).connect(metroGain);
+      osc.start(time);
+      osc.stop(time + 0.05);
+
+      // Визуальный LED в реальном времени возле предполагаемого удара
+      const delay = Math.max(0, (time - audioCtx.currentTime) * 1000);
+      setTimeout(() => {
+        metroLed.classList.add('on');
+        setTimeout(() => metroLed.classList.remove('on'), 80);
+      }, delay);
+    }
+
+    function scheduler(){
+      while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+        const accented = (currentBeat === 0);
+        scheduleClick(nextNoteTime, accented);
+        nextNote();
+      }
+    }
+
+    function startMetronome(){
+      if (audioCtx.state !== 'running') audioCtx.resume();
+      metroOn = true;
+      currentBeat = 0;
+      nextNoteTime = audioCtx.currentTime + 0.05; // небольшой сдвиг
+      if (schedulerTimer) clearInterval(schedulerTimer);
+      schedulerTimer = setInterval(scheduler, lookahead);
+      metroBtn.textContent = 'Стоп метроном';
+    }
+    function stopMetronome(){
+      metroOn = false;
+      if (schedulerTimer) clearInterval(schedulerTimer);
+      schedulerTimer = null;
+      metroBtn.textContent = 'Метроном';
+    }
+
+    metroBtn.addEventListener('click', () => {
+      metroOn ? stopMetronome() : startMetronome();
+    });
+
+    // ====== АВТО-РАЗРЕШЕНИЕ АУДИО ======
+    window.addEventListener('click', async () => {
+      if (audioCtx.state !== 'running') await audioCtx.resume();
+    }, { once: true });
+  </script>
+</body>
+</html>
